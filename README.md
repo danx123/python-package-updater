@@ -14,8 +14,8 @@ Progress Bar → indicates progress, preventing GUI freezes.
 Error Handling → clear error messages if pip is not found or the command fails.
 ---
 
-## 📝 Changelog v1.6.0
-- Update Framework
+## 📝 Changelog v1.7.0
+- Improve Performance
 
 ## 🖼️ The GUI consists of:
 Table Widget → package list (Name, Current Version, Latest Version, Type).
