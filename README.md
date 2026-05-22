@@ -20,6 +20,6 @@ Action Buttons → Check, Update All, Uninstall Selected.
 Progress Bar → appears while the process is running.
 ---
 ## 📸 Screenshot
-<img width="853" height="634" alt="image" src="https://github.com/user-attachments/assets/3be714d7-73e9-43ab-88fd-7d4b9ed44470" />
+<img width="1103" height="652" alt="Screenshot 2026-05-22 160745" src="https://github.com/user-attachments/assets/8090779d-1f19-48aa-be09-3e036fb6c775" />
 
 
