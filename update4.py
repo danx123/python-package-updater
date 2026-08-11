@@ -123,6 +123,22 @@ SVG_ICONS = {
         "zap",
         '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>',
     ),
+    "install_whl": SVG_WRAPPER.format(
+        "package",
+        '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>'
+        '<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>'
+        '<line x1="12" y1="22.08" x2="12" y2="12"></line>',
+    ),
+}
+
+# ======================================================================
+# MAPPING NAMA IMPORT MODULE -> NAMA PACKAGE PIP (utk filter scan file)
+# ======================================================================
+PACKAGE_MAPPING = {
+    'bs4': 'beautifulsoup4',
+    'yaml': 'pyyaml',
+    'cv2': 'opencv-python',
+    'PIL': 'pillow',
 }
 
 
@@ -142,6 +158,7 @@ class Worker(QObject):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                bufsize=1,  # line-buffered biar log real-time per baris
                 encoding="utf-8",
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0,
             )
@@ -177,7 +194,7 @@ class PythonPackageUpdater(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Python Package Updater by Danx (v4.0)")
+        self.setWindowTitle("Python Package Updater by Danx (v4.2)")
         self.setGeometry(100, 100, 1100, 620)
         icon_path = "icon.ico"
         if hasattr(sys, "_MEIPASS"):
@@ -187,6 +204,12 @@ class PythonPackageUpdater(QMainWindow):
         self.setStyleSheet(MODERN_QSS)
 
         self.current_filter = None
+
+        # [OPTIMASI] Cache icon SVG biar tidak parsing XML->QPixmap berulang kali
+        # (dipakai lagi di context menu klik kanan, dsb.)
+        self.icon_cache = {}
+        for name, svg_data in SVG_ICONS.items():
+            self.icon_cache[name] = self.create_svg_icon(svg_data)
 
         self.thread = QThread()
         self.worker = Worker()
@@ -234,12 +257,12 @@ class PythonPackageUpdater(QMainWindow):
         
         self.check_layout = QHBoxLayout()
         self.check_all_button = QPushButton("Check All Outdated")
-        self.check_all_button.setIcon(self.create_svg_icon(SVG_ICONS["check_all"]))
+        self.check_all_button.setIcon(self.icon_cache["check_all"])
         self.check_all_button.clicked.connect(self.check_outdated_packages)
         self.check_layout.addWidget(self.check_all_button)
         
         self.scan_file_button = QPushButton("Scan File & Check...")
-        self.scan_file_button.setIcon(self.create_svg_icon(SVG_ICONS["scan_file"]))
+        self.scan_file_button.setIcon(self.icon_cache["scan_file"])
         self.scan_file_button.clicked.connect(self.scan_file_and_check)
         self.check_layout.addWidget(self.scan_file_button)
         
@@ -248,18 +271,18 @@ class PythonPackageUpdater(QMainWindow):
         self.action_layout = QHBoxLayout()
         
         self.update_button = QPushButton("Update All")
-        self.update_button.setIcon(self.create_svg_icon(SVG_ICONS["update"]))
+        self.update_button.setIcon(self.icon_cache["update"])
         self.update_button.clicked.connect(self.update_all_packages)
         self.action_layout.addWidget(self.update_button)
 
         # [ADDED] Tombol Update Selected
         self.update_selected_button = QPushButton("Update Selected")
-        self.update_selected_button.setIcon(self.create_svg_icon(SVG_ICONS["update"]))
+        self.update_selected_button.setIcon(self.icon_cache["update"])
         self.update_selected_button.clicked.connect(self.update_selected_packages)
         self.action_layout.addWidget(self.update_selected_button)
         
         self.uninstall_button = QPushButton("Uninstall Selected")
-        self.uninstall_button.setIcon(self.create_svg_icon(SVG_ICONS["uninstall"]))
+        self.uninstall_button.setIcon(self.icon_cache["uninstall"])
         self.uninstall_button.clicked.connect(self.uninstall_selected_packages)
         self.action_layout.addWidget(self.uninstall_button)
         
@@ -267,22 +290,31 @@ class PythonPackageUpdater(QMainWindow):
         
         self.reqs_layout = QHBoxLayout()
         self.create_reqs_button = QPushButton("Create requirements.txt")
-        self.create_reqs_button.setIcon(self.create_svg_icon(SVG_ICONS["create_reqs"]))
+        self.create_reqs_button.setIcon(self.icon_cache["create_reqs"])
         self.create_reqs_button.clicked.connect(self.create_requirements)
         self.reqs_layout.addWidget(self.create_reqs_button)
         
         self.install_reqs_button = QPushButton("Install from requirements.txt")
-        self.install_reqs_button.setIcon(self.create_svg_icon(SVG_ICONS["install_reqs"]))
+        self.install_reqs_button.setIcon(self.icon_cache["install_reqs"])
         self.install_reqs_button.clicked.connect(self.install_requirements)
         self.reqs_layout.addWidget(self.install_reqs_button)
 
         # [ADDED] Tombol Clear pip Cache
         self.clear_cache_button = QPushButton("Clear pip Cache")
-        self.clear_cache_button.setIcon(self.create_svg_icon(SVG_ICONS["clear_cache"]))
+        self.clear_cache_button.setIcon(self.icon_cache["clear_cache"])
         self.clear_cache_button.clicked.connect(self.clear_pip_cache)
         self.reqs_layout.addWidget(self.clear_cache_button)
         
         self.layout.addLayout(self.reqs_layout)
+
+        # [ADDED] Tombol Install .whl (dari path)
+        self.whl_layout = QHBoxLayout()
+        self.install_whl_button = QPushButton("Install .whl (from path)")
+        self.install_whl_button.setIcon(self.icon_cache["install_whl"])
+        self.install_whl_button.clicked.connect(self.install_whl_from_path)
+        self.whl_layout.addWidget(self.install_whl_button)
+
+        self.layout.addLayout(self.whl_layout)
 
         # === Panel kanan (Log Sidebar) ===
         self.right_panel = QWidget()
@@ -338,6 +370,7 @@ class PythonPackageUpdater(QMainWindow):
             self.create_reqs_button.setEnabled(False)
             self.install_reqs_button.setEnabled(False)
             self.clear_cache_button.setEnabled(False)
+            self.install_whl_button.setEnabled(False)
         else:
             has_outdated = self.table_widget.rowCount() > 0
             has_selection = len(self.table_widget.selectedItems()) > 0
@@ -347,6 +380,7 @@ class PythonPackageUpdater(QMainWindow):
             self.create_reqs_button.setEnabled(True)
             self.install_reqs_button.setEnabled(True)
             self.clear_cache_button.setEnabled(True)
+            self.install_whl_button.setEnabled(True)
             
             self.update_button.setEnabled(has_outdated)
             self.update_selected_button.setEnabled(has_selection) # [MODIFIED]
@@ -479,11 +513,11 @@ class PythonPackageUpdater(QMainWindow):
             return
 
         # Add Action: Update Selected
-        update_action = menu.addAction(self.create_svg_icon(SVG_ICONS["update"]), "Update Selected")
+        update_action = menu.addAction(self.icon_cache["update"], "Update Selected")
         update_action.triggered.connect(self.update_selected_packages)
         
         # Add Action: Uninstall Selected
-        uninstall_action = menu.addAction(self.create_svg_icon(SVG_ICONS["uninstall"]), "Uninstall Selected")
+        uninstall_action = menu.addAction(self.icon_cache["uninstall"], "Uninstall Selected")
         uninstall_action.triggered.connect(self.uninstall_selected_packages)
         
         menu.exec(self.table_widget.mapToGlobal(pos))
@@ -587,6 +621,26 @@ class PythonPackageUpdater(QMainWindow):
             command = [python_exe, "-m", "pip", "cache", "purge"]
             self.start_work.emit("clear_cache", command)
 
+    # [ADDED] Method Install .whl dari path
+    def install_whl_from_path(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select .whl File to Install", "", "Wheel Files (*.whl)"
+        )
+        if not file_path:
+            return
+
+        reply = QMessageBox.question(
+            self, "Confirmation",
+            f"Are you sure you want to install this wheel file?\n\n{file_path}",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            self.install_whl_button.setText("Installing...")
+            self.prepare_for_work()
+            python_exe = self.get_python_executable()
+            command = [python_exe, "-m", "pip", "install", "--force-reinstall", file_path]
+            self.start_work.emit("install_whl", command)
+
     # ======================================================================
     # 4. SLOT UNTUK MENANGANI HASIL DARI WORKER
     # ======================================================================
@@ -614,16 +668,22 @@ class PythonPackageUpdater(QMainWindow):
                 for line in table_data:
                     parts = line.split()
                     if parts:
-                        pkg_name = parts[0].lower() 
-                        pkg_name_norm = pkg_name.replace('-', '_') 
-                        
-                        if pkg_name in self.current_filter or pkg_name_norm in self.current_filter:
+                        pkg_name = parts[0].lower()
+                        pkg_name_norm = pkg_name.replace('-', '_')
+
+                        is_match = (pkg_name in self.current_filter or
+                                    pkg_name_norm in self.current_filter)
+
+                        if not is_match:
+                            # Cek reverse mapping (nama import != nama package pip)
+                            for imp_name, pip_name in PACKAGE_MAPPING.items():
+                                if pip_name == pkg_name and imp_name in self.current_filter:
+                                    is_match = True
+                                    break
+
+                        if is_match:
                             filtered_data.append(line)
-                        elif 'beautifulsoup4' in pkg_name and 'bs4' in self.current_filter:
-                             filtered_data.append(line)
-                        elif 'pyyaml' in pkg_name and 'yaml' in self.current_filter:
-                             filtered_data.append(line)
-                             
+
                 table_data = filtered_data
                 self.log_output.append(f"--- Displaying {len(table_data)} matching packages ---")
                 
@@ -632,6 +692,9 @@ class PythonPackageUpdater(QMainWindow):
             if not table_data:
                 QMessageBox.information(self, "Information", "All packages are up to date! 👍\n(Or no packages matched the scan filter)")
             else:
+                # [OPTIMASI] Matikan repaint UI selama bulk-insert biar tabel
+                # ratusan baris langsung muncul instan, baru nyalakan lagi.
+                self.table_widget.setUpdatesEnabled(False)
                 self.table_widget.setRowCount(len(table_data))
                 for i, line in enumerate(table_data):
                     parts = line.split()
@@ -641,6 +704,7 @@ class PythonPackageUpdater(QMainWindow):
                         self.table_widget.setItem(i, 1, QTableWidgetItem(current))
                         self.table_widget.setItem(i, 2, QTableWidgetItem(latest))
                         self.table_widget.setItem(i, 3, QTableWidgetItem(type))
+                self.table_widget.setUpdatesEnabled(True)
         
         elif identifier == "update":
             self.log_output.append("\n--- UPDATE COMPLETE ---")
@@ -679,6 +743,12 @@ class PythonPackageUpdater(QMainWindow):
             self.log_output.append("\n--- PIP CACHE PURGE COMPLETE ---")
             QMessageBox.information(self, "Success", "pip cache has been cleared successfully! 🗑️")
 
+        elif identifier == "install_whl":
+            self.log_output.append("\n--- WHEEL INSTALLATION COMPLETE ---")
+            QMessageBox.information(self, "Success", "The .whl file has been installed successfully! 📦")
+            self.check_outdated_packages()
+            return
+
         self.reset_all_button_text()
         self.update_button_states(is_working=False)
 
@@ -699,10 +769,13 @@ class PythonPackageUpdater(QMainWindow):
         self.create_reqs_button.setText("Create requirements.txt")
         self.install_reqs_button.setText("Install from requirements.txt")
         self.clear_cache_button.setText("Clear pip Cache")
+        self.install_whl_button.setText("Install .whl (from path)")
         
     def closeEvent(self, event):
         self.thread.quit()
         self.thread.wait()
+        self.worker.deleteLater()  # Bersihkan object worker
+        self.thread.deleteLater()  # Bersihkan thread
         super().closeEvent(event)
 
 
